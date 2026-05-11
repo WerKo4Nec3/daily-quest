@@ -118,8 +118,11 @@ function loadCompletions() {
 function App() {
   const [tasks, setTasks] = useState(loadTasks)
   const [completions, setCompletions] = useState(loadCompletions)
+
   const [selectedTaskId, setSelectedTaskId] = useState(null)
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+
+  const [taskFormMode, setTaskFormMode] = useState(null)
+  const [editingTaskId, setEditingTaskId] = useState(null)
   const [taskForm, setTaskForm] = useState(initialTaskForm)
   const [formError, setFormError] = useState('')
 
@@ -169,6 +172,16 @@ function App() {
     return tasks.find((task) => task.id === selectedTaskId) ?? null
   }, [selectedTaskId, tasks])
 
+  const editingTask = useMemo(() => {
+    if (!editingTaskId) {
+      return null
+    }
+
+    return tasks.find((task) => task.id === editingTaskId) ?? null
+  }, [editingTaskId, tasks])
+
+  const isTaskFormOpen = taskFormMode !== null
+
   function isTaskCompletedToday(taskId) {
     return completedTaskIdsToday.has(taskId)
   }
@@ -199,13 +212,27 @@ function App() {
 
   function openCreateTaskModal() {
     setSelectedTaskId(null)
+    setEditingTaskId(null)
     setTaskForm(initialTaskForm)
     setFormError('')
-    setIsCreateModalOpen(true)
+    setTaskFormMode('create')
   }
 
-  function closeCreateTaskModal() {
-    setIsCreateModalOpen(false)
+  function openEditTaskModal(task) {
+    setSelectedTaskId(null)
+    setEditingTaskId(task.id)
+    setTaskForm({
+      title: task.title,
+      description: task.description,
+      points: String(task.points)
+    })
+    setFormError('')
+    setTaskFormMode('edit')
+  }
+
+  function closeTaskFormModal() {
+    setTaskFormMode(null)
+    setEditingTaskId(null)
     setTaskForm(initialTaskForm)
     setFormError('')
   }
@@ -217,7 +244,7 @@ function App() {
     }))
   }
 
-  function createTask(event) {
+  function saveTask(event) {
     event.preventDefault()
 
     const title = taskForm.title.trim()
@@ -234,21 +261,82 @@ function App() {
       return
     }
 
+    const roundedPoints = Math.round(points)
     const now = new Date().toISOString()
 
-    const newTask = {
-      id: createId('task'),
-      title,
-      description,
-      points: Math.round(points),
-      isDaily: true,
-      isActive: true,
-      createdAt: now,
-      updatedAt: now
+    if (taskFormMode === 'create') {
+      const newTask = {
+        id: createId('task'),
+        title,
+        description,
+        points: roundedPoints,
+        isDaily: true,
+        isActive: true,
+        createdAt: now,
+        updatedAt: now
+      }
+
+      setTasks((currentTasks) => [...currentTasks, newTask])
+      closeTaskFormModal()
+      return
     }
 
-    setTasks((currentTasks) => [...currentTasks, newTask])
-    closeCreateTaskModal()
+    if (taskFormMode === 'edit') {
+      if (!editingTask) {
+        setFormError('Не удалось найти задачу для редактирования.')
+        return
+      }
+
+      setTasks((currentTasks) =>
+        currentTasks.map((task) => {
+          if (task.id !== editingTask.id) {
+            return task
+          }
+
+          return {
+            ...task,
+            title,
+            description,
+            points: roundedPoints,
+            updatedAt: now
+          }
+        })
+      )
+
+      setCompletions((currentCompletions) =>
+        currentCompletions.map((completion) => {
+          const isTodayCompletion =
+            completion.taskId === editingTask.id && completion.date === todayDateKey
+
+          if (!isTodayCompletion) {
+            return completion
+          }
+
+          return {
+            ...completion,
+            points: roundedPoints
+          }
+        })
+      )
+
+      closeTaskFormModal()
+    }
+  }
+
+  function deleteTask(taskId) {
+    const shouldDelete = window.confirm(
+      'Удалить задачу? Все выполнения этой задачи тоже будут удалены.'
+    )
+
+    if (!shouldDelete) {
+      return
+    }
+
+    setTasks((currentTasks) => currentTasks.filter((task) => task.id !== taskId))
+    setCompletions((currentCompletions) =>
+      currentCompletions.filter((completion) => completion.taskId !== taskId)
+    )
+    setSelectedTaskId(null)
   }
 
   function closeTaskDetails() {
@@ -365,22 +453,40 @@ function App() {
                 ? 'Отменить выполнение'
                 : 'Выполнить задачу'}
             </button>
+
+            <div className="modal-actions-grid">
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => openEditTaskModal(selectedTask)}
+              >
+                Редактировать
+              </button>
+
+              <button
+                className="danger-button"
+                type="button"
+                onClick={() => deleteTask(selectedTask.id)}
+              >
+                Удалить
+              </button>
+            </div>
           </section>
         </div>
       )}
 
-      {isCreateModalOpen && (
-        <div className="modal-overlay" onClick={closeCreateTaskModal}>
+      {isTaskFormOpen && (
+        <div className="modal-overlay" onClick={closeTaskFormModal}>
           <section className="task-modal" onClick={(event) => event.stopPropagation()}>
             <div className="modal-header">
-              <h2>Новая задача</h2>
+              <h2>{taskFormMode === 'create' ? 'Новая задача' : 'Редактирование задачи'}</h2>
 
-              <button className="close-button" type="button" onClick={closeCreateTaskModal}>
+              <button className="close-button" type="button" onClick={closeTaskFormModal}>
                 ×
               </button>
             </div>
 
-            <form className="task-form" onSubmit={createTask}>
+            <form className="task-form" onSubmit={saveTask}>
               <label className="form-field">
                 <span>Название</span>
                 <input
@@ -420,7 +526,7 @@ function App() {
               {formError && <p className="form-error">{formError}</p>}
 
               <button className="modal-action-button" type="submit">
-                Создать задачу
+                {taskFormMode === 'create' ? 'Создать задачу' : 'Сохранить изменения'}
               </button>
             </form>
           </section>
