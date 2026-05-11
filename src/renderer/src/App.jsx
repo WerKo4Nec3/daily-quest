@@ -53,7 +53,7 @@ function getLocalDateKey(date = new Date()) {
 }
 
 function createId(prefix) {
-  if (crypto.randomUUID) {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return `${prefix}-${crypto.randomUUID()}`
   }
 
@@ -116,6 +116,8 @@ function loadCompletions() {
 }
 
 function App() {
+  const [activePage, setActivePage] = useState('today')
+
   const [tasks, setTasks] = useState(loadTasks)
   const [completions, setCompletions] = useState(loadCompletions)
 
@@ -162,7 +164,17 @@ function App() {
     return todayCompletions.reduce((sum, completion) => sum + completion.points, 0)
   }, [todayCompletions])
 
+  const totalPoints = useMemo(() => {
+    return completions.reduce((sum, completion) => sum + completion.points, 0)
+  }, [completions])
+
+  const activeTasksCount = useMemo(() => {
+    return tasks.filter((task) => task.isActive).length
+  }, [tasks])
+
+  const inactiveTasksCount = tasks.length - activeTasksCount
   const totalTasksCount = todayTasks.length
+  const totalCompletionsCount = completions.length
 
   const selectedTask = useMemo(() => {
     if (!selectedTaskId) {
@@ -208,6 +220,24 @@ function App() {
     }
 
     setCompletions((currentCompletions) => [...currentCompletions, newCompletion])
+  }
+
+  function toggleTaskActive(taskId) {
+    const now = new Date().toISOString()
+
+    setTasks((currentTasks) =>
+      currentTasks.map((task) => {
+        if (task.id !== taskId) {
+          return task
+        }
+
+        return {
+          ...task,
+          isActive: !task.isActive,
+          updatedAt: now
+        }
+      })
+    )
   }
 
   function openCreateTaskModal() {
@@ -345,72 +375,233 @@ function App() {
 
   return (
     <main className="app">
-      <section className="today-page">
-        <header className="page-header">
-          <div>
-            <p className="date-label">{todayText}</p>
-            <h1>Сегодня</h1>
-          </div>
+      <section className="content-shell">
+        {activePage === 'today' && (
+          <section className="today-page">
+            <header className="page-header">
+              <div>
+                <p className="date-label">{todayText}</p>
+                <h1>Сегодня</h1>
+              </div>
 
-          <button className="add-button" type="button" onClick={openCreateTaskModal}>
-            +
-          </button>
-        </header>
+              <button className="add-button" type="button" onClick={openCreateTaskModal}>
+                +
+              </button>
+            </header>
 
-        <section className="summary-card">
-          <div>
-            <p className="summary-label">Баллы сегодня</p>
-            <p className="summary-value">{todayPoints}</p>
-          </div>
+            <section className="summary-card">
+              <div>
+                <p className="summary-label">Баллы сегодня</p>
+                <p className="summary-value">{todayPoints}</p>
+              </div>
 
-          <div>
-            <p className="summary-label">Выполнено</p>
-            <p className="summary-value">
-              {completedTasksCount} / {totalTasksCount}
-            </p>
-          </div>
-        </section>
+              <div>
+                <p className="summary-label">Выполнено</p>
+                <p className="summary-value">
+                  {completedTasksCount} / {totalTasksCount}
+                </p>
+              </div>
+            </section>
 
-        <section className="task-list">
-          {todayTasks.length === 0 && (
-            <div className="empty-card">
-              <h2>На сегодня задач нет</h2>
-              <p>Нажмите на кнопку “+”, чтобы создать первую ежедневную задачу.</p>
-            </div>
-          )}
-
-          {todayTasks.map((task) => {
-            const completed = isTaskCompletedToday(task.id)
-
-            return (
-              <article
-                className={`task-card ${completed ? 'task-card-completed' : ''}`}
-                key={task.id}
-                onClick={() => setSelectedTaskId(task.id)}
-              >
-                <button
-                  className="task-checkbox"
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    toggleTask(task)
-                  }}
-                  aria-label={completed ? 'Отменить выполнение' : 'Выполнить задачу'}
-                >
-                  {completed ? '✓' : ''}
-                </button>
-
-                <div className="task-info">
-                  <h2>{task.title}</h2>
-                  <p>{task.description || 'Описание не добавлено'}</p>
+            <section className="task-list">
+              {todayTasks.length === 0 && (
+                <div className="empty-card">
+                  <h2>На сегодня задач нет</h2>
+                  <p>Нажмите на кнопку “+”, чтобы создать первую ежедневную задачу.</p>
                 </div>
+              )}
 
-                <div className="task-points">+{task.points}</div>
+              {todayTasks.map((task) => {
+                const completed = isTaskCompletedToday(task.id)
+
+                return (
+                  <article
+                    className={`task-card ${completed ? 'task-card-completed' : ''}`}
+                    key={task.id}
+                    onClick={() => setSelectedTaskId(task.id)}
+                  >
+                    <button
+                      className="task-checkbox"
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        toggleTask(task)
+                      }}
+                      aria-label={completed ? 'Отменить выполнение' : 'Выполнить задачу'}
+                    >
+                      {completed ? '✓' : ''}
+                    </button>
+
+                    <div className="task-info">
+                      <h2>{task.title}</h2>
+                      <p>{task.description || 'Описание не добавлено'}</p>
+                    </div>
+
+                    <div className="task-points">+{task.points}</div>
+                  </article>
+                )
+              })}
+            </section>
+          </section>
+        )}
+
+        {activePage === 'tasks' && (
+          <section className="tasks-page">
+            <header className="page-header">
+              <div>
+                <p className="date-label">Управление задачами</p>
+                <h1>Все задачи</h1>
+              </div>
+
+              <button className="add-button" type="button" onClick={openCreateTaskModal}>
+                +
+              </button>
+            </header>
+
+            <section className="task-list">
+              {tasks.length === 0 && (
+                <div className="empty-card">
+                  <h2>Задач пока нет</h2>
+                  <p>Создайте первую задачу, и она появится на экране “Сегодня”.</p>
+                </div>
+              )}
+
+              {tasks.map((task) => (
+                <article className="management-card" key={task.id}>
+                  <div className="management-main">
+                    <div>
+                      <div className="management-title-row">
+                        <h2>{task.title}</h2>
+
+                        <span className={`status-pill ${task.isActive ? 'active' : 'inactive'}`}>
+                          {task.isActive ? 'Активна' : 'Отключена'}
+                        </span>
+                      </div>
+
+                      <p>{task.description || 'Описание не добавлено'}</p>
+                    </div>
+
+                    <div className="task-points">+{task.points}</div>
+                  </div>
+
+                  <div className="management-actions">
+                    <button
+                      className="secondary-button"
+                      type="button"
+                      onClick={() => setSelectedTaskId(task.id)}
+                    >
+                      Подробнее
+                    </button>
+
+                    <button
+                      className="secondary-button"
+                      type="button"
+                      onClick={() => openEditTaskModal(task)}
+                    >
+                      Редактировать
+                    </button>
+
+                    <button
+                      className="secondary-button"
+                      type="button"
+                      onClick={() => toggleTaskActive(task.id)}
+                    >
+                      {task.isActive ? 'Отключить' : 'Включить'}
+                    </button>
+
+                    <button
+                      className="danger-button"
+                      type="button"
+                      onClick={() => deleteTask(task.id)}
+                    >
+                      Удалить
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </section>
+          </section>
+        )}
+
+        {activePage === 'stats' && (
+          <section className="stats-page">
+            <header className="page-header">
+              <div>
+                <p className="date-label">Прогресс и история</p>
+                <h1>Статистика</h1>
+              </div>
+            </header>
+
+            <section className="stats-grid">
+              <article className="stat-card">
+                <p className="summary-label">Баллы сегодня</p>
+                <p className="summary-value">{todayPoints}</p>
               </article>
-            )
-          })}
-        </section>
+
+              <article className="stat-card">
+                <p className="summary-label">Всего баллов</p>
+                <p className="summary-value">{totalPoints}</p>
+              </article>
+
+              <article className="stat-card">
+                <p className="summary-label">Выполнено сегодня</p>
+                <p className="summary-value">
+                  {completedTasksCount} / {totalTasksCount}
+                </p>
+              </article>
+
+              <article className="stat-card">
+                <p className="summary-label">Всего выполнений</p>
+                <p className="summary-value">{totalCompletionsCount}</p>
+              </article>
+
+              <article className="stat-card">
+                <p className="summary-label">Активные задачи</p>
+                <p className="summary-value">{activeTasksCount}</p>
+              </article>
+
+              <article className="stat-card">
+                <p className="summary-label">Отключённые задачи</p>
+                <p className="summary-value">{inactiveTasksCount}</p>
+              </article>
+            </section>
+
+            <div className="empty-card stats-note">
+              <h2>Позже добавим графики</h2>
+              <p>
+                Здесь можно будет показать серию дней, календарь активности, уровни и прогресс по
+                каждой задаче.
+              </p>
+            </div>
+          </section>
+        )}
       </section>
+
+      <nav className="bottom-nav" aria-label="Главная навигация">
+        <button
+          className={`nav-button ${activePage === 'today' ? 'nav-button-active' : ''}`}
+          type="button"
+          onClick={() => setActivePage('today')}
+        >
+          <span>Сегодня</span>
+        </button>
+
+        <button
+          className={`nav-button ${activePage === 'tasks' ? 'nav-button-active' : ''}`}
+          type="button"
+          onClick={() => setActivePage('tasks')}
+        >
+          <span>Задачи</span>
+        </button>
+
+        <button
+          className={`nav-button ${activePage === 'stats' ? 'nav-button-active' : ''}`}
+          type="button"
+          onClick={() => setActivePage('stats')}
+        >
+          <span>Статистика</span>
+        </button>
+      </nav>
 
       {selectedTask && (
         <div className="modal-overlay" onClick={closeTaskDetails}>
@@ -438,21 +629,28 @@ function App() {
             </div>
 
             <div className="modal-info-row">
+              <span>Активность</span>
+              <strong>{selectedTask.isActive ? 'Активна' : 'Отключена'}</strong>
+            </div>
+
+            <div className="modal-info-row">
               <span>Статус сегодня</span>
               <strong>
                 {isTaskCompletedToday(selectedTask.id) ? 'Выполнена' : 'Не выполнена'}
               </strong>
             </div>
 
-            <button
-              className="modal-action-button"
-              type="button"
-              onClick={() => toggleTask(selectedTask)}
-            >
-              {isTaskCompletedToday(selectedTask.id)
-                ? 'Отменить выполнение'
-                : 'Выполнить задачу'}
-            </button>
+            {selectedTask.isActive && (
+              <button
+                className="modal-action-button"
+                type="button"
+                onClick={() => toggleTask(selectedTask)}
+              >
+                {isTaskCompletedToday(selectedTask.id)
+                  ? 'Отменить выполнение'
+                  : 'Выполнить задачу'}
+              </button>
+            )}
 
             <div className="modal-actions-grid">
               <button
@@ -464,7 +662,15 @@ function App() {
               </button>
 
               <button
-                className="danger-button"
+                className="secondary-button"
+                type="button"
+                onClick={() => toggleTaskActive(selectedTask.id)}
+              >
+                {selectedTask.isActive ? 'Отключить' : 'Включить'}
+              </button>
+
+              <button
+                className="danger-button modal-wide-button"
                 type="button"
                 onClick={() => deleteTask(selectedTask.id)}
               >
