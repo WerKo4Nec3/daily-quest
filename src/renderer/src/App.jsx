@@ -13,7 +13,8 @@ const defaultTasks = [
     points: 10,
     isDaily: true,
     isActive: true,
-    createdAt: '2026-05-11T00:00:00.000Z'
+    createdAt: '2026-05-11T00:00:00.000Z',
+    updatedAt: '2026-05-11T00:00:00.000Z'
   },
   {
     id: 'task-2',
@@ -22,7 +23,8 @@ const defaultTasks = [
     points: 5,
     isDaily: true,
     isActive: true,
-    createdAt: '2026-05-11T00:00:00.000Z'
+    createdAt: '2026-05-11T00:00:00.000Z',
+    updatedAt: '2026-05-11T00:00:00.000Z'
   },
   {
     id: 'task-3',
@@ -31,9 +33,16 @@ const defaultTasks = [
     points: 20,
     isDaily: true,
     isActive: true,
-    createdAt: '2026-05-11T00:00:00.000Z'
+    createdAt: '2026-05-11T00:00:00.000Z',
+    updatedAt: '2026-05-11T00:00:00.000Z'
   }
 ]
+
+const initialTaskForm = {
+  title: '',
+  description: '',
+  points: '10'
+}
 
 function getLocalDateKey(date = new Date()) {
   const year = date.getFullYear()
@@ -51,6 +60,19 @@ function createId(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
+function normalizeTask(task) {
+  return {
+    id: task.id ?? createId('task'),
+    title: task.title ?? 'Без названия',
+    description: task.description ?? '',
+    points: Number(task.points) || 1,
+    isDaily: task.isDaily ?? true,
+    isActive: task.isActive ?? true,
+    createdAt: task.createdAt ?? new Date().toISOString(),
+    updatedAt: task.updatedAt ?? new Date().toISOString()
+  }
+}
+
 function loadTasks() {
   try {
     const savedTasks = localStorage.getItem(STORAGE_KEYS.tasks)
@@ -65,7 +87,7 @@ function loadTasks() {
       return defaultTasks
     }
 
-    return parsedTasks
+    return parsedTasks.map(normalizeTask)
   } catch (error) {
     console.error('Не удалось загрузить задачи:', error)
     return defaultTasks
@@ -97,6 +119,9 @@ function App() {
   const [tasks, setTasks] = useState(loadTasks)
   const [completions, setCompletions] = useState(loadCompletions)
   const [selectedTaskId, setSelectedTaskId] = useState(null)
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [taskForm, setTaskForm] = useState(initialTaskForm)
+  const [formError, setFormError] = useState('')
 
   const todayDateKey = getLocalDateKey()
 
@@ -172,6 +197,60 @@ function App() {
     setCompletions((currentCompletions) => [...currentCompletions, newCompletion])
   }
 
+  function openCreateTaskModal() {
+    setSelectedTaskId(null)
+    setTaskForm(initialTaskForm)
+    setFormError('')
+    setIsCreateModalOpen(true)
+  }
+
+  function closeCreateTaskModal() {
+    setIsCreateModalOpen(false)
+    setTaskForm(initialTaskForm)
+    setFormError('')
+  }
+
+  function updateTaskForm(field, value) {
+    setTaskForm((currentForm) => ({
+      ...currentForm,
+      [field]: value
+    }))
+  }
+
+  function createTask(event) {
+    event.preventDefault()
+
+    const title = taskForm.title.trim()
+    const description = taskForm.description.trim()
+    const points = Number(taskForm.points)
+
+    if (!title) {
+      setFormError('Введите название задачи.')
+      return
+    }
+
+    if (!Number.isFinite(points) || points <= 0) {
+      setFormError('Баллы должны быть числом больше 0.')
+      return
+    }
+
+    const now = new Date().toISOString()
+
+    const newTask = {
+      id: createId('task'),
+      title,
+      description,
+      points: Math.round(points),
+      isDaily: true,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now
+    }
+
+    setTasks((currentTasks) => [...currentTasks, newTask])
+    closeCreateTaskModal()
+  }
+
   function closeTaskDetails() {
     setSelectedTaskId(null)
   }
@@ -185,7 +264,7 @@ function App() {
             <h1>Сегодня</h1>
           </div>
 
-          <button className="add-button" type="button">
+          <button className="add-button" type="button" onClick={openCreateTaskModal}>
             +
           </button>
         </header>
@@ -205,6 +284,13 @@ function App() {
         </section>
 
         <section className="task-list">
+          {todayTasks.length === 0 && (
+            <div className="empty-card">
+              <h2>На сегодня задач нет</h2>
+              <p>Нажмите на кнопку “+”, чтобы создать первую ежедневную задачу.</p>
+            </div>
+          )}
+
           {todayTasks.map((task) => {
             const completed = isTaskCompletedToday(task.id)
 
@@ -228,7 +314,7 @@ function App() {
 
                 <div className="task-info">
                   <h2>{task.title}</h2>
-                  <p>{task.description}</p>
+                  <p>{task.description || 'Описание не добавлено'}</p>
                 </div>
 
                 <div className="task-points">+{task.points}</div>
@@ -249,7 +335,9 @@ function App() {
               </button>
             </div>
 
-            <p className="modal-description">{selectedTask.description}</p>
+            <p className="modal-description">
+              {selectedTask.description || 'Описание для этой задачи пока не добавлено.'}
+            </p>
 
             <div className="modal-info-row">
               <span>Баллы</span>
@@ -277,6 +365,64 @@ function App() {
                 ? 'Отменить выполнение'
                 : 'Выполнить задачу'}
             </button>
+          </section>
+        </div>
+      )}
+
+      {isCreateModalOpen && (
+        <div className="modal-overlay" onClick={closeCreateTaskModal}>
+          <section className="task-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Новая задача</h2>
+
+              <button className="close-button" type="button" onClick={closeCreateTaskModal}>
+                ×
+              </button>
+            </div>
+
+            <form className="task-form" onSubmit={createTask}>
+              <label className="form-field">
+                <span>Название</span>
+                <input
+                  type="text"
+                  value={taskForm.title}
+                  onChange={(event) => updateTaskForm('title', event.target.value)}
+                  placeholder="Например: Учить японский"
+                  autoFocus
+                />
+              </label>
+
+              <label className="form-field">
+                <span>Описание</span>
+                <textarea
+                  value={taskForm.description}
+                  onChange={(event) => updateTaskForm('description', event.target.value)}
+                  placeholder="Что именно нужно сделать?"
+                  rows="4"
+                />
+              </label>
+
+              <label className="form-field">
+                <span>Баллы</span>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={taskForm.points}
+                  onChange={(event) => updateTaskForm('points', event.target.value)}
+                />
+              </label>
+
+              <div className="daily-note">
+                Эта задача будет появляться каждый день без привязки ко времени.
+              </div>
+
+              {formError && <p className="form-error">{formError}</p>}
+
+              <button className="modal-action-button" type="submit">
+                Создать задачу
+              </button>
+            </form>
           </section>
         </div>
       )}

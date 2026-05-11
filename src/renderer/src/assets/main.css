@@ -20,8 +20,14 @@ body {
     linear-gradient(135deg, #111318 0%, #1b1f2a 100%);
 }
 
-button {
+button,
+input,
+textarea {
   font: inherit;
+}
+
+button {
+  border: none;
 }
 
 .app {
@@ -58,7 +64,6 @@ button {
 .add-button {
   width: 52px;
   height: 52px;
-  border: none;
   border-radius: 18px;
   color: #111318;
   background: #facc15;
@@ -172,6 +177,24 @@ button {
   font-weight: 800;
 }
 
+.empty-card {
+  padding: 28px;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.05);
+  text-align: center;
+}
+
+.empty-card h2 {
+  margin: 0 0 8px;
+  font-size: 22px;
+}
+
+.empty-card p {
+  margin: 0;
+  color: #9ca3af;
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -183,6 +206,8 @@ button {
 
 .task-modal {
   width: min(520px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
   padding: 24px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 28px;
@@ -206,12 +231,15 @@ button {
 .close-button {
   width: 36px;
   height: 36px;
-  border: none;
   border-radius: 12px;
   color: #f5f5f5;
   background: rgba(255, 255, 255, 0.08);
   font-size: 24px;
   cursor: pointer;
+}
+
+.close-button:hover {
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .modal-description {
@@ -236,7 +264,6 @@ button {
   width: 100%;
   margin-top: 22px;
   padding: 14px 18px;
-  border: none;
   border-radius: 18px;
   color: #111318;
   background: #facc15;
@@ -250,6 +277,57 @@ button {
 .modal-action-button:hover {
   transform: translateY(-1px);
   opacity: 0.92;
+}
+
+.task-form {
+  display: grid;
+  gap: 16px;
+}
+
+.form-field {
+  display: grid;
+  gap: 8px;
+}
+
+.form-field span {
+  color: #d1d5db;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.form-field input,
+.form-field textarea {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  outline: none;
+  color: #f5f5f5;
+  background: rgba(255, 255, 255, 0.07);
+  padding: 13px 14px;
+  resize: vertical;
+}
+
+.form-field input:focus,
+.form-field textarea:focus {
+  border-color: rgba(250, 204, 21, 0.7);
+}
+
+.daily-note {
+  padding: 12px 14px;
+  border-radius: 16px;
+  color: #d1d5db;
+  background: rgba(250, 204, 21, 0.1);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.form-error {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 16px;
+  color: #fecaca;
+  background: rgba(239, 68, 68, 0.16);
+  font-size: 14px;
 }
 
 @media (max-width: 640px) {
